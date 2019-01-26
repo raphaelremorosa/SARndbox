@@ -68,10 +68,16 @@ const Vrui::ToolFactory* GlobalWaterTool::getFactory(void) const
 
 void GlobalWaterTool::buttonCallback(int buttonSlotIndex,Vrui::InputDevice::ButtonCallbackData* cbData)
 	{
+	// waterAmount is the constant at which rain is added/removed
 	GLfloat waterAmount=application->rainStrength/application->waterSpeed;
 	if(!cbData->newButtonState)
 		waterAmount=-waterAmount;
-	if(buttonSlotIndex==1)
+	// Dry button - remove rain at a constant
+	if(buttonSlotIndex==1){
 		waterAmount=-waterAmount;
+		// std::cout << "Hello" << std::endl;
+	}
+	// Rain button - add rain at a constant
 	application->waterTable->setWaterDeposit(application->waterTable->getWaterDeposit()+waterAmount);
+	// std::cout << "from the other side" << std::endl;
 	}

@@ -84,6 +84,7 @@ BathymetrySaverToolFactory::BathymetrySaverToolFactory(WaterTable2* sWaterTable,
 	for(int i=0;i<2;++i)
 		{
 		gridSize[i]=waterTable->getBathymetrySize(i);
+        std::cout << gridSize[i] << std::endl;
 		cellSize[i]=waterTable->getCellSize()[i];
 		}
 	

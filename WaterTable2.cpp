@@ -778,6 +778,7 @@ void WaterTable2::updateBathymetry(GLContextData& contextData) const
 		
 		/* Update the bathymetry and quantity grids: */
 		dataItem->currentBathymetry=1-dataItem->currentBathymetry;
+        // std::cout << dataItem->currentBathymetry << std::endl;
 		dataItem->bathymetryVersion=depthImageRenderer->getDepthImageVersion();
 		dataItem->currentQuantity=1-dataItem->currentQuantity;
 		}
@@ -835,6 +836,7 @@ void WaterTable2::updateBathymetry(const GLfloat* bathymetryGrid,GLContextData& 
 
 	/* Update the bathymetry and quantity grids: */
 	dataItem->currentBathymetry=1-dataItem->currentBathymetry;
+    // std::cout << dataItem->currentBathymetry << std::endl;
 	dataItem->currentQuantity=1-dataItem->currentQuantity;
 	}
 
