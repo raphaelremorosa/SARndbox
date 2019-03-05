@@ -336,10 +336,11 @@ void Sandbox::rainStrengthSliderCallback(GLMotif::TextFieldSlider::ValueChangedC
 	{
 	rainStrength=cbData->value;
 	}
-	
+
 void Sandbox::evaporationRateSliderCallback(GLMotif::TextFieldSlider::ValueChangedCallbackData* cbData)
 	{
 	evaporationRate=cbData->value;
+	waterTable->setWaterDeposit(evaporationRate);
 	}
 
 void Sandbox::waterMaxStepsSliderCallback(GLMotif::TextFieldSlider::ValueChangedCallbackData* cbData)
@@ -425,7 +426,7 @@ GLMotif::PopupWindow* Sandbox::createWaterControlDialog(void)
 	evaporationRateSlider->getTextField()->setPrecision(4);
 	evaporationRateSlider->getTextField()->setFloatFormat(GLMotif::TextField::SMART);
 	evaporationRateSlider->setSliderMapping(GLMotif::TextFieldSlider::LINEAR);
-	evaporationRateSlider->setValueRange(0.0,10.0,0.05);
+	evaporationRateSlider->setValueRange(-10.0,10.0,0.05);
 	evaporationRateSlider->getSlider()->addNotch(0.0f);
 	evaporationRateSlider->setValue(evaporationRate);
 	evaporationRateSlider->getValueChangedCallbacks().add(this,&Sandbox::evaporationRateSliderCallback);
