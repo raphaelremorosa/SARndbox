@@ -332,6 +332,16 @@ void Sandbox::waterSpeedSliderCallback(GLMotif::TextFieldSlider::ValueChangedCal
 	waterSpeed=cbData->value;
 	}
 
+void Sandbox::rainStrengthSliderCallback(GLMotif::TextFieldSlider::ValueChangedCallbackData* cbData)
+	{
+	rainStrength=cbData->value;
+	}
+	
+void Sandbox::evaporationRateSliderCallback(GLMotif::TextFieldSlider::ValueChangedCallbackData* cbData)
+	{
+	evaporationRate=cbData->value;
+	}
+
 void Sandbox::waterMaxStepsSliderCallback(GLMotif::TextFieldSlider::ValueChangedCallbackData* cbData)
 	{
 	waterMaxSteps=int(Math::floor(cbData->value+0.5));
@@ -396,6 +406,30 @@ GLMotif::PopupWindow* Sandbox::createWaterControlDialog(void)
 	waterSpeedSlider->setValue(waterSpeed);
 	waterSpeedSlider->getValueChangedCallbacks().add(this,&Sandbox::waterSpeedSliderCallback);
 	
+	new GLMotif::Label("RainStrengthLabel",waterControlDialog,"Rain Strength");
+	
+	rainStrengthSlider=new GLMotif::TextFieldSlider("RainStrengthSlider",waterControlDialog,8,ss.fontHeight*10.0f);
+	rainStrengthSlider->getTextField()->setFieldWidth(7);
+	rainStrengthSlider->getTextField()->setPrecision(4);
+	rainStrengthSlider->getTextField()->setFloatFormat(GLMotif::TextField::SMART);
+	rainStrengthSlider->setSliderMapping(GLMotif::TextFieldSlider::EXP10);
+	rainStrengthSlider->setValueRange(0.001,10.0,0.05);
+	rainStrengthSlider->getSlider()->addNotch(0.25f);
+	rainStrengthSlider->setValue(rainStrength);
+	rainStrengthSlider->getValueChangedCallbacks().add(this,&Sandbox::rainStrengthSliderCallback);
+
+	new GLMotif::Label("EvaporationRateLabel",waterControlDialog,"Evaporation Rate");
+	
+	evaporationRateSlider=new GLMotif::TextFieldSlider("EvaporationRateSlider",waterControlDialog,8,ss.fontHeight*10.0f);
+	evaporationRateSlider->getTextField()->setFieldWidth(7);
+	evaporationRateSlider->getTextField()->setPrecision(4);
+	evaporationRateSlider->getTextField()->setFloatFormat(GLMotif::TextField::SMART);
+	evaporationRateSlider->setSliderMapping(GLMotif::TextFieldSlider::LINEAR);
+	evaporationRateSlider->setValueRange(0.0,10.0,0.05);
+	evaporationRateSlider->getSlider()->addNotch(0.0f);
+	evaporationRateSlider->setValue(evaporationRate);
+	evaporationRateSlider->getValueChangedCallbacks().add(this,&Sandbox::evaporationRateSliderCallback);
+
 	new GLMotif::Label("WaterMaxStepsLabel",waterControlDialog,"Max Steps");
 	
 	waterMaxStepsSlider=new GLMotif::TextFieldSlider("WaterMaxStepsSlider",waterControlDialog,8,ss.fontHeight*10.0f);
@@ -552,7 +586,7 @@ Sandbox::Sandbox(int& argc,char**& argv)
 	 sun(0),
 	 activeDem(0),
 	 mainMenu(0),pauseUpdatesToggle(0),waterControlDialog(0),
-	 waterSpeedSlider(0),waterMaxStepsSlider(0),frameRateTextField(0),waterAttenuationSlider(0),
+	 waterSpeedSlider(0),rainStrengthSlider(0),evaporationRateSlider(0),waterMaxStepsSlider(0),frameRateTextField(0),waterAttenuationSlider(0),
 	 controlPipeFd(-1)
 	{
 	/* Read the sandbox's default configuration parameters: */
@@ -585,7 +619,7 @@ Sandbox::Sandbox(int& argc,char**& argv)
 	waterMaxSteps=cfg.retrieveValue<unsigned int>("./waterMaxSteps",30U);
 	Math::Interval<double> rainElevationRange=cfg.retrieveValue<Math::Interval<double> >("./rainElevationRange",Math::Interval<double>(-1000.0,1000.0));
 	rainStrength=cfg.retrieveValue<GLfloat>("./rainStrength",0.25f);
-	double evaporationRate=cfg.retrieveValue<double>("./evaporationRate",0.0);
+	evaporationRate=cfg.retrieveValue<double>("./evaporationRate",0.0);
 	float demDistScale=cfg.retrieveValue<float>("./demDistScale",1.0f);
 	std::string controlPipeName=cfg.retrieveString("./controlPipeName","");
 	

@@ -160,7 +160,12 @@ public class GUI extends JFrame implements ActionListener, ChangeListener
 				Double ws1 = Double.valueOf(sliders[1].getValue())/100;
 				int ws2 = sliders[2].getValue();
 				Double evr = Double.valueOf(sliders[3].getValue())/100 - 0.5;
-				pb = new ProcessBuilder(new String[]{"/bin/bash", "-c", "make && ./bin/SARndbox -uhm -fpv -rs " + rs + " -ws " + ws1 + " " + ws2 + " -evr " + evr + "> out.txt"});
+				pb = new ProcessBuilder(new String[]{"/bin/bash", "-c", 
+				"make && ./bin/SARndbox -uhm -fpv -rs " + rs + 
+				" -ws " + ws1 + " " + ws2 + 
+				" -evr " + evr + 
+				" -wo 2.0 " + 
+				" -ucl 1.0 " + " > out.txt"});
 				try
 				{
 					System.out.println(rs);
@@ -168,7 +173,6 @@ public class GUI extends JFrame implements ActionListener, ChangeListener
 					System.out.println(ws2);
 					System.out.println(evr);
 					p = pb.start();
-					
 				}
 				catch(Exception e)
 				{
@@ -204,21 +208,21 @@ public class GUI extends JFrame implements ActionListener, ChangeListener
 		switch(action){
 			case "Yellow":
 				value = Math.random() * 7.5 + 7.5;
-				value = value / 1000;
+				value = value / 360;
 				textField[3].setText(value.toString());
-				sliders[3].setValue((int)(value * 100.0) + 60);
+				sliders[3].setValue((int)(value * 100.0)+50);
 				break;
 			case "Orange":
 				value = Math.random() * 15 + 15;
-				value = value / 1000;
+				value = value / 360;
 				textField[3].setText(value.toString());
-				sliders[3].setValue((int)(value * 100.0) + 65);
+				sliders[3].setValue((int)(value * 100.0)+50);
 				break;
 			case "Red":
 				value = Math.random() * 15 + 30;
-				value = value / 1000;
+				value = value / 360;
 				textField[3].setText(value.toString());
-				sliders[3].setValue((int)(value * 100.0) + 70);
+				sliders[3].setValue((int)(value * 100.0)+50);
 				break;
 			default:
 				break;

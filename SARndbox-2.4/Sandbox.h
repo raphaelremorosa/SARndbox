@@ -139,6 +139,7 @@ class Sandbox:public Vrui::Application,public GLObject
 	double waterSpeed; // Relative speed of water flow simulation
 	unsigned int waterMaxSteps; // Maximum number of water simulation steps per frame
 	GLfloat rainStrength; // Amount of water deposited by rain tools and objects on each water simulation step
+	double evaporationRate;
 	HandExtractor* handExtractor; // Object to detect splayed hands above the sand surface to make rain
 	const AddWaterFunction* addWaterFunction; // Render function registered with the water table
 	bool addWaterFunctionRegistered; // Flag if the water adding function is currently registered with the water table
@@ -152,6 +153,8 @@ class Sandbox:public Vrui::Application,public GLObject
 	GLMotif::ToggleButton* pauseUpdatesToggle;
 	GLMotif::PopupWindow* waterControlDialog;
 	GLMotif::TextFieldSlider* waterSpeedSlider;
+	GLMotif::TextFieldSlider* rainStrengthSlider;
+	GLMotif::TextFieldSlider* evaporationRateSlider;
 	GLMotif::TextFieldSlider* waterMaxStepsSlider;
 	GLMotif::TextField* frameRateTextField;
 	GLMotif::TextFieldSlider* waterAttenuationSlider;
@@ -165,6 +168,8 @@ class Sandbox:public Vrui::Application,public GLObject
 	void pauseUpdatesCallback(GLMotif::ToggleButton::ValueChangedCallbackData* cbData);
 	void showWaterControlDialogCallback(Misc::CallbackData* cbData);
 	void waterSpeedSliderCallback(GLMotif::TextFieldSlider::ValueChangedCallbackData* cbData);
+	void rainStrengthSliderCallback(GLMotif::TextFieldSlider::ValueChangedCallbackData* cbData);
+	void evaporationRateSliderCallback(GLMotif::TextFieldSlider::ValueChangedCallbackData* cbData);
 	void waterMaxStepsSliderCallback(GLMotif::TextFieldSlider::ValueChangedCallbackData* cbData);
 	void waterAttenuationSliderCallback(GLMotif::TextFieldSlider::ValueChangedCallbackData* cbData);
 	GLMotif::PopupMenu* createMainMenu(void);
