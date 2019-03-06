@@ -348,6 +348,25 @@ void Sandbox::waterMaxStepsSliderCallback(GLMotif::TextFieldSlider::ValueChanged
 	waterMaxSteps=int(Math::floor(cbData->value+0.5));
 	}
 
+void Sandbox::waterOpacitySliderCallback(GLMotif::TextFieldSlider::ValueChangedCallbackData* cbData)
+	{
+	renderSettings.back().waterOpacity=GLfloat(cbData->value);
+	for(std::vector<RenderSettings>::iterator rsIt=renderSettings.begin();rsIt!=renderSettings.end();++rsIt)
+		{
+			rsIt->surfaceRenderer->setWaterOpacity(rsIt->waterOpacity);
+		}
+	}
+
+void Sandbox::contourLinesSliderCallback(GLMotif::TextFieldSlider::ValueChangedCallbackData* cbData)
+	{
+	renderSettings.back().contourLineSpacing=GLfloat(cbData->value);
+	for(std::vector<RenderSettings>::iterator rsIt=renderSettings.begin();rsIt!=renderSettings.end();++rsIt)
+		{
+			rsIt->surfaceRenderer->setContourLineDistance(rsIt->contourLineSpacing);
+		}
+	}
+
+
 void Sandbox::waterAttenuationSliderCallback(GLMotif::TextFieldSlider::ValueChangedCallbackData* cbData)
 	{
 	waterTable->setAttenuation(GLfloat(1.0-cbData->value));
@@ -443,18 +462,55 @@ GLMotif::PopupWindow* Sandbox::createWaterControlDialog(void)
 	waterMaxStepsSlider->setValue(waterMaxSteps);
 	waterMaxStepsSlider->getValueChangedCallbacks().add(this,&Sandbox::waterMaxStepsSliderCallback);
 	
-	new GLMotif::Label("FrameRateLabel",waterControlDialog,"Frame Rate");
+	new GLMotif::Label("WaterOpacityLabel",waterControlDialog,"Water Opacity");
 	
-	GLMotif::Margin* frameRateMargin=new GLMotif::Margin("FrameRateMargin",waterControlDialog,false);
-	frameRateMargin->setAlignment(GLMotif::Alignment::LEFT);
+	waterOpacitySlider=new GLMotif::TextFieldSlider("WaterOpacitySlider",waterControlDialog,8,ss.fontHeight*10.0f);
+	waterOpacitySlider->getTextField()->setFieldWidth(7);
+	waterOpacitySlider->getTextField()->setPrecision(4);
+	waterOpacitySlider->getTextField()->setFloatFormat(GLMotif::TextField::SMART);
+	waterOpacitySlider->setSliderMapping(GLMotif::TextFieldSlider::LINEAR);
+	waterOpacitySlider->setValueRange(-10.0,10.0,0.05);
+	waterOpacitySlider->getSlider()->addNotch(0.0f);
+	waterOpacitySlider->setValue(renderSettings.back().waterOpacity);
+	waterOpacitySlider->getValueChangedCallbacks().add(this,&Sandbox::waterOpacitySliderCallback);
+
+	new GLMotif::Label("ContourLinesLabel",waterControlDialog,"Contour Lines");
 	
-	frameRateTextField=new GLMotif::TextField("FrameRateTextField",frameRateMargin,8);
-	frameRateTextField->setFieldWidth(7);
-	frameRateTextField->setPrecision(2);
-	frameRateTextField->setFloatFormat(GLMotif::TextField::FIXED);
-	frameRateTextField->setValue(0.0);
+	contourLinesSlider=new GLMotif::TextFieldSlider("ContourLinesSlider",waterControlDialog,8,ss.fontHeight*10.0f);
+	contourLinesSlider->getTextField()->setFieldWidth(7);
+	contourLinesSlider->getTextField()->setPrecision(4);
+	contourLinesSlider->getTextField()->setFloatFormat(GLMotif::TextField::SMART);
+	contourLinesSlider->setSliderMapping(GLMotif::TextFieldSlider::LINEAR);
+	contourLinesSlider->setValueRange(-10.0,10.0,0.05);
+	contourLinesSlider->getSlider()->addNotch(0.0f);
+	contourLinesSlider->setValue(renderSettings.back().contourLineSpacing);
+	contourLinesSlider->getValueChangedCallbacks().add(this,&Sandbox::contourLinesSliderCallback);
+
+	new GLMotif::Label("ElapsedTimeLabel",waterControlDialog,"Elapsed Time");
+
+	GLMotif::Margin* elapsedTimeMargin=new GLMotif::Margin("ElapsedTimeMargin",waterControlDialog,false);
+	elapsedTimeMargin->setAlignment(GLMotif::Alignment::LEFT);
 	
-	frameRateMargin->manageChild();
+	elapsedTimeTextField=new GLMotif::TextField("ElapsedTimeTextField",elapsedTimeMargin,8);
+	elapsedTimeTextField->setFieldWidth(7);
+	elapsedTimeTextField->setPrecision(2);
+	elapsedTimeTextField->setFloatFormat(GLMotif::TextField::FIXED);
+	elapsedTimeTextField->setValue(0.0);
+
+	elapsedTimeMargin->manageChild();
+	
+	// new GLMotif::Label("FrameRateLabel",waterControlDialog,"Frame Rate");
+	
+	// GLMotif::Margin* frameRateMargin=new GLMotif::Margin("FrameRateMargin",waterControlDialog,false);
+	// frameRateMargin->setAlignment(GLMotif::Alignment::LEFT);
+	
+	// frameRateTextField=new GLMotif::TextField("FrameRateTextField",frameRateMargin,8);
+	// frameRateTextField->setFieldWidth(7);
+	// frameRateTextField->setPrecision(2);
+	// frameRateTextField->setFloatFormat(GLMotif::TextField::FIXED);
+	// frameRateTextField->setValue(0.0);
+	
+	// frameRateMargin->manageChild();
 	
 	new GLMotif::Label("WaterAttenuationLabel",waterControlDialog,"Attenuation");
 	
@@ -587,7 +643,7 @@ Sandbox::Sandbox(int& argc,char**& argv)
 	 sun(0),
 	 activeDem(0),
 	 mainMenu(0),pauseUpdatesToggle(0),waterControlDialog(0),
-	 waterSpeedSlider(0),rainStrengthSlider(0),evaporationRateSlider(0),waterMaxStepsSlider(0),frameRateTextField(0),waterAttenuationSlider(0),
+	 waterSpeedSlider(0),rainStrengthSlider(0),evaporationRateSlider(0),waterOpacitySlider(0),contourLinesSlider(0),elapsedTimeTextField(0),waterMaxStepsSlider(0),frameRateTextField(0),waterAttenuationSlider(0),
 	 controlPipeFd(-1)
 	{
 	/* Read the sandbox's default configuration parameters: */
@@ -623,7 +679,7 @@ Sandbox::Sandbox(int& argc,char**& argv)
 	evaporationRate=cfg.retrieveValue<double>("./evaporationRate",0.0);
 	float demDistScale=cfg.retrieveValue<float>("./demDistScale",1.0f);
 	std::string controlPipeName=cfg.retrieveString("./controlPipeName","");
-	
+
 	/* Process command line parameters: */
 	bool printHelp=false;
 	const char* frameFilePrefix=0;
@@ -1268,6 +1324,17 @@ void Sandbox::frame(void)
 		{
 		/* Update the frame rate display: */
 		frameRateTextField->setValue(1.0/Vrui::getCurrentFrameTime());
+		}
+	
+	if(elapsedTimeTextField!=0&&Vrui::getWidgetManager()->isVisible(waterControlDialog))
+		{
+		/* Update the time elapsed display: */
+		// elapsedTimeTextField->setValue(Vrui::getApplicationTime());
+		elapsedTimeTextField->setValue(elapsedTime += Vrui::getFrameTime());
+		}
+	else
+		{
+			elapsedTime = 0.0;
 		}
 	
 	if(pauseUpdates)

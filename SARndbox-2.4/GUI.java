@@ -163,15 +163,9 @@ public class GUI extends JFrame implements ActionListener, ChangeListener
 				pb = new ProcessBuilder(new String[]{"/bin/bash", "-c", 
 				"make && ./bin/SARndbox -uhm -fpv -rs " + rs + 
 				" -ws " + ws1 + " " + ws2 + 
-				" -evr " + evr + 
-				" -wo 2.0 " + 
-				" -ucl 1.0 " + " > out.txt"});
+				" -evr " + evr + " > out.txt"});
 				try
 				{
-					System.out.println(rs);
-					System.out.println(ws1);
-					System.out.println(ws2);
-					System.out.println(evr);
 					p = pb.start();
 				}
 				catch(Exception e)
