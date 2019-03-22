@@ -324,6 +324,7 @@ void Sandbox::pauseUpdatesCallback(GLMotif::ToggleButton::ValueChangedCallbackDa
 void Sandbox::varyingRainCallback(GLMotif::ToggleButton::ValueChangedCallbackData* cbData)
 	{
 	varyingRain=cbData->set;
+	varyingRainValue=0.0f;
 	}
 
 void Sandbox::showWaterControlDialogCallback(Misc::CallbackData* cbData)
@@ -687,7 +688,8 @@ Sandbox::Sandbox(int& argc,char**& argv)
 	evaporationRate=cfg.retrieveValue<double>("./evaporationRate",0.0);
 	float demDistScale=cfg.retrieveValue<float>("./demDistScale",1.0f);
 	std::string controlPipeName=cfg.retrieveString("./controlPipeName","");
-
+	varyingRainValue=0.0f;
+	rainIncrement=true;
 	/* Process command line parameters: */
 	bool printHelp=false;
 	const char* frameFilePrefix=0;
@@ -1343,7 +1345,23 @@ void Sandbox::frame(void)
 	if(varyingRainToggle!=0&&varyingRain)
 		{
 		// KOCCHI
-		waterTable->setWaterDeposit(evaporationRate+=0.1);
+		double temp=(rand()%20)/100.0f;
+		if(varyingRainValue<1.5f&&rainIncrement)
+		{
+			varyingRainValue+=temp;
+			if(varyingRainValue>=1.5f) rainIncrement=false;
+		}
+		else if(varyingRainValue>-1.5f&&!rainIncrement)
+		{
+			varyingRainValue-=temp;
+			if(varyingRainValue<=-1.5f) rainIncrement=true;
+		}
+
+
+		// if(varyingRainValue > 1.5f) varyingRainValue-=temp;
+		// else if(varyingRainValue < -1.0f) varyingRainValue+=temp;
+		waterTable->setWaterDeposit(varyingRainValue);
+		// std::cout << varyingRainValue << std::endl;
 		}
 
 	if(pauseUpdates)
