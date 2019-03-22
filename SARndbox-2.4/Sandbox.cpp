@@ -308,7 +308,6 @@ void Sandbox::addWater(GLContextData& contextData) const
 				{
 				Scalar angle=Scalar(2)*Math::Constants<Scalar>::pi*Scalar(i)/Scalar(32);
 				glVertex(hIt->center+x*(Math::cos(angle)*hIt->radius*0.75)+y*(Math::sin(angle)*hIt->radius*0.75));
-				std::cout << hIt->center << std::endl;
 				}
 			glEnd();
 			}
@@ -320,6 +319,11 @@ void Sandbox::addWater(GLContextData& contextData) const
 void Sandbox::pauseUpdatesCallback(GLMotif::ToggleButton::ValueChangedCallbackData* cbData)
 	{
 	pauseUpdates=cbData->set;
+	}
+
+void Sandbox::varyingRainCallback(GLMotif::ToggleButton::ValueChangedCallbackData* cbData)
+	{
+	varyingRain=cbData->set;
 	}
 
 void Sandbox::showWaterControlDialogCallback(Misc::CallbackData* cbData)
@@ -393,6 +397,10 @@ GLMotif::PopupMenu* Sandbox::createMainMenu(void)
 		showWaterControlDialogButton->getSelectCallbacks().add(this,&Sandbox::showWaterControlDialogCallback);
 		}
 	
+	varyingRainToggle=new GLMotif::ToggleButton("VaryingRainToggle",mainMenu,"Varying Rain");
+	varyingRainToggle->setToggle(false);
+	varyingRainToggle->getValueChangedCallbacks().add(this,&Sandbox::varyingRainCallback);
+
 	/* Finish building the main menu: */
 	mainMenu->manageChild();
 	
@@ -636,13 +644,13 @@ void printUsage(void)
 Sandbox::Sandbox(int& argc,char**& argv)
 	:Vrui::Application(argc,argv),
 	 camera(0),pixelDepthCorrection(0),
-	 frameFilter(0),pauseUpdates(false),
+	 frameFilter(0),pauseUpdates(false),varyingRain(false),
 	 depthImageRenderer(0),
 	 waterTable(0),
 	 handExtractor(0),addWaterFunction(0),addWaterFunctionRegistered(false),
 	 sun(0),
 	 activeDem(0),
-	 mainMenu(0),pauseUpdatesToggle(0),waterControlDialog(0),
+	 mainMenu(0),pauseUpdatesToggle(0),varyingRainToggle(0),waterControlDialog(0),
 	 waterSpeedSlider(0),rainStrengthSlider(0),evaporationRateSlider(0),waterOpacitySlider(0),contourLinesSlider(0),elapsedTimeTextField(0),waterMaxStepsSlider(0),frameRateTextField(0),waterAttenuationSlider(0),
 	 controlPipeFd(-1)
 	{
@@ -1326,17 +1334,18 @@ void Sandbox::frame(void)
 		frameRateTextField->setValue(1.0/Vrui::getCurrentFrameTime());
 		}
 	
-	if(elapsedTimeTextField!=0&&Vrui::getWidgetManager()->isVisible(waterControlDialog))
+	if(elapsedTimeTextField!=0)
 		{
 		/* Update the time elapsed display: */
-		// elapsedTimeTextField->setValue(Vrui::getApplicationTime());
 		elapsedTimeTextField->setValue(elapsedTime += Vrui::getFrameTime());
 		}
-	else
-		{
-			elapsedTime = 0.0;
-		}
 	
+	if(varyingRainToggle!=0&&varyingRain)
+		{
+		// KOCCHI
+		waterTable->setWaterDeposit(evaporationRate+=0.1);
+		}
+
 	if(pauseUpdates)
 		Vrui::scheduleUpdate(Vrui::getApplicationTime()+1.0/30.0);
 	}

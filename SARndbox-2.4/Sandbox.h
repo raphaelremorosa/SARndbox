@@ -131,6 +131,7 @@ class Sandbox:public Vrui::Application,public GLObject
 	Kinect::FrameSource::IntrinsicParameters cameraIps; // Intrinsic parameters of the Kinect camera
 	FrameFilter* frameFilter; // Processing object to filter raw depth frames from the Kinect camera
 	bool pauseUpdates; // Pauses updates of the topography
+	bool varyingRain;
 	Threads::TripleBuffer<Kinect::FrameBuffer> filteredFrames; // Triple buffer for incoming filtered depth frames
 	DepthImageRenderer* depthImageRenderer; // Object managing the current filtered depth image
 	ONTransform boxTransform; // Transformation from camera space to baseplane space (x along long sandbox axis, z up)
@@ -152,6 +153,7 @@ class Sandbox:public Vrui::Application,public GLObject
 	DEM* activeDem; // The currently active DEM
 	GLMotif::PopupMenu* mainMenu;
 	GLMotif::ToggleButton* pauseUpdatesToggle;
+	GLMotif::ToggleButton* varyingRainToggle;
 	GLMotif::PopupWindow* waterControlDialog;
 	GLMotif::TextFieldSlider* waterSpeedSlider;
 	GLMotif::TextFieldSlider* rainStrengthSlider;
@@ -170,6 +172,7 @@ class Sandbox:public Vrui::Application,public GLObject
 	void toggleDEM(DEM* dem); // Sets or toggles the currently active DEM
 	void addWater(GLContextData& contextData) const; // Function to render geometry that adds water to the water table
 	void pauseUpdatesCallback(GLMotif::ToggleButton::ValueChangedCallbackData* cbData);
+	void varyingRainCallback(GLMotif::ToggleButton::ValueChangedCallbackData* cbData);
 	void showWaterControlDialogCallback(Misc::CallbackData* cbData);
 	void waterSpeedSliderCallback(GLMotif::TextFieldSlider::ValueChangedCallbackData* cbData);
 	void rainStrengthSliderCallback(GLMotif::TextFieldSlider::ValueChangedCallbackData* cbData);
