@@ -579,7 +579,7 @@ GLMotif::PopupWindow* Sandbox::createWaterControlDialog(void)
 	waterControlDialog->setPacking(GLMotif::RowColumn::PACK_TIGHT);
 	waterControlDialog->setNumMinorWidgets(2);
 	
-	new GLMotif::Label("RainStrengthLabel",waterControlDialog,"Rain Strength");
+	new GLMotif::Label("RainStrengthLabel",waterControlDialog,"Rain Strength (cm/s)");
 	rainStrengthSlider=new GLMotif::TextFieldSlider("RainStrengthSlider",waterControlDialog,8,ss.fontHeight*10.0f);
 	rainStrengthSlider->getTextField()->setFieldWidth(7);
 	rainStrengthSlider->getTextField()->setPrecision(4);
@@ -590,13 +590,13 @@ GLMotif::PopupWindow* Sandbox::createWaterControlDialog(void)
 	rainStrengthSlider->setValue(rainStrength);
 	rainStrengthSlider->getValueChangedCallbacks().add(this,&Sandbox::rainStrengthSliderCallback);
 
-	new GLMotif::Label("EvaporationRateLabel",waterControlDialog,"Evaporation Rate");
+	new GLMotif::Label("EvaporationRateLabel",waterControlDialog,"Evaporation Rate (cm/s)");
 	evaporationRateSlider=new GLMotif::TextFieldSlider("EvaporationRateSlider",waterControlDialog,8,ss.fontHeight*10.0f);
 	evaporationRateSlider->getTextField()->setFieldWidth(7);
 	evaporationRateSlider->getTextField()->setPrecision(4);
 	evaporationRateSlider->getTextField()->setFloatFormat(GLMotif::TextField::SMART);
 	evaporationRateSlider->setSliderMapping(GLMotif::TextFieldSlider::LINEAR);
-	evaporationRateSlider->setValueRange(-10.0,10.0,0.05);
+	evaporationRateSlider->setValueRange(-100.0,100.0,0.05);
 	evaporationRateSlider->getSlider()->addNotch(0.0f);
 	evaporationRateSlider->setValue(evaporationRate);
 	evaporationRateSlider->getValueChangedCallbacks().add(this,&Sandbox::evaporationRateSliderCallback);
@@ -607,7 +607,7 @@ GLMotif::PopupWindow* Sandbox::createWaterControlDialog(void)
 	waterSpeedSlider->getTextField()->setPrecision(4);
 	waterSpeedSlider->getTextField()->setFloatFormat(GLMotif::TextField::SMART);
 	waterSpeedSlider->setSliderMapping(GLMotif::TextFieldSlider::EXP10);
-	waterSpeedSlider->setValueRange(0.001,10.0,0.05);
+	waterSpeedSlider->setValueRange(0.001,50.0,0.05);
 	waterSpeedSlider->getSlider()->addNotch(0.0f);
 	waterSpeedSlider->setValue(waterSpeed);
 	waterSpeedSlider->getValueChangedCallbacks().add(this,&Sandbox::waterSpeedSliderCallback);
@@ -618,18 +618,18 @@ GLMotif::PopupWindow* Sandbox::createWaterControlDialog(void)
 	waterOpacitySlider->getTextField()->setPrecision(4);
 	waterOpacitySlider->getTextField()->setFloatFormat(GLMotif::TextField::SMART);
 	waterOpacitySlider->setSliderMapping(GLMotif::TextFieldSlider::LINEAR);
-	waterOpacitySlider->setValueRange(-10.0,10.0,0.05);
+	waterOpacitySlider->setValueRange(-50.0,50.0,0.05);
 	waterOpacitySlider->getSlider()->addNotch(0.0f);
 	waterOpacitySlider->setValue(renderSettings.back().waterOpacity);
 	waterOpacitySlider->getValueChangedCallbacks().add(this,&Sandbox::waterOpacitySliderCallback);
 
-	new GLMotif::Label("ContourLinesLabel",waterControlDialog,"Contour Lines");
+	new GLMotif::Label("ContourLinesLabel",waterControlDialog,"Contour Lines (m)");
 	contourLinesSlider=new GLMotif::TextFieldSlider("ContourLinesSlider",waterControlDialog,8,ss.fontHeight*10.0f);
 	contourLinesSlider->getTextField()->setFieldWidth(7);
 	contourLinesSlider->getTextField()->setPrecision(4);
 	contourLinesSlider->getTextField()->setFloatFormat(GLMotif::TextField::SMART);
 	contourLinesSlider->setSliderMapping(GLMotif::TextFieldSlider::LINEAR);
-	contourLinesSlider->setValueRange(-10.0,10.0,0.05);
+	contourLinesSlider->setValueRange(0.0,100.0,0.1);
 	contourLinesSlider->getSlider()->addNotch(0.0f);
 	contourLinesSlider->setValue(renderSettings.back().contourLineSpacing);
 	contourLinesSlider->getValueChangedCallbacks().add(this,&Sandbox::contourLinesSliderCallback);
@@ -651,7 +651,7 @@ GLMotif::PopupWindow* Sandbox::createWaterControlDialog(void)
 	scaleSlider->getValueChangedCallbacks().add(this,&Sandbox::scaleSliderCallback);
 	#endif
 
-	new GLMotif::Label("ElapsedTimeLabel",waterControlDialog,"Elapsed Time");
+	new GLMotif::Label("ElapsedTimeLabel",waterControlDialog,"Elapsed Time (s)");
 	GLMotif::Margin* elapsedTimeMargin=new GLMotif::Margin("ElapsedTimeMargin",waterControlDialog,false);
 	elapsedTimeMargin->setAlignment(GLMotif::Alignment::LEFT);
 	elapsedTimeTextField=new GLMotif::TextField("ElapsedTimeTextField",elapsedTimeMargin,8);
@@ -1554,19 +1554,20 @@ void Sandbox::frame(void)
 	if(seepage&&!handExtractor->getLockedExtractedHands().empty())
 		{
 			totalRaintime += Vrui::getFrameTime();
-			// std::cout << "RAIN: " << totalRaintime << " :: " << rainStrength << std::endl;
 		}
 	if(seepage&&handExtractor->getLockedExtractedHands().empty()&&totalRaintime>0.0f)
 		{
-			totalRaintime -= Vrui::getFrameTime();
-			double ratio = 10*Vrui::getFrameTime()*rainStrength*(-1);
-			waterTable->setWaterDeposit(ratio);
+			/* Time ratio; =1 normal, >1 longer, <1 shorter */
+			double tRatio = 0.5;
+			totalRaintime -= Vrui::getFrameTime()/tRatio;
+			/* Main concern for the proper implementation of the seepage function */
+			double ratio = 1; // 50 looks more like 90%
+			waterTable->setWaterDeposit((-1)*rainStrength*(ratio/100.0f));
 			if(totalRaintime<0.0f)
 				{
 				totalRaintime=0.0f;
 				waterTable->setWaterDeposit(0);
 				}
-			// std::cout << "SEEPAGE: " << totalRaintime << " :: " << ratio << std::endl;
 		}
 
 	if(pauseUpdates)
