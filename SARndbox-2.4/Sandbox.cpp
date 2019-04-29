@@ -323,8 +323,15 @@ void Sandbox::pauseUpdatesCallback(GLMotif::ToggleButton::ValueChangedCallbackDa
 
 void Sandbox::varyingRainCallback(GLMotif::ToggleButton::ValueChangedCallbackData* cbData)
 	{
+	#ifdef ADMU_ALLS
 	varyingRain=cbData->set;
 	varyingRainValue=0.0f;
+	#endif
+	}
+
+void Sandbox::seepageCallback(GLMotif::ToggleButton::ValueChangedCallbackData* cbData)
+	{
+	seepage=cbData->set;
 	}
 
 void Sandbox::showWaterControlDialogCallback(Misc::CallbackData* cbData)
@@ -371,12 +378,144 @@ void Sandbox::contourLinesSliderCallback(GLMotif::TextFieldSlider::ValueChangedC
 		}
 	}
 
+/**
+ * Highly experimental code,
+ * running this code will require you to declare all variables used inside the method
+ * in `Sandbox.h`
+ */
+void Sandbox::scaleSliderCallback(GLMotif::TextFieldSlider::ValueChangedCallbackData* cbData)
+	{
+		#ifdef ADMU_ALLS
+		scale=cbData->value;
+		double sf=scale/100.0;
+		for(int i=0;i<3;++i)
+			for(int j=0;j<4;++j)
+				cameraIps.depthProjection.getMatrix()(i,j)*=sf;
+		basePlane=Geometry::Plane<double,3>(basePlane.getNormal(),basePlane.getOffset()*sf);
+		for(int i=0;i<4;++i)
+			for(int j=0;j<3;++j)
+				basePlaneCorners[i][j]*=sf;
+		if(elevationRange!=Math::Interval<double>::full)
+			elevationRange*=sf;
+		if(rainElevationRange!=Math::Interval<double>::full)
+			rainElevationRange*=sf;
+		for(std::vector<RenderSettings>::iterator rsIt=renderSettings.begin();rsIt!=renderSettings.end();++rsIt)
+			{
+			if(rsIt->elevationColorMap!=0)
+				rsIt->elevationColorMap->setScalarRange(rsIt->elevationColorMap->getScalarRangeMin()*sf,rsIt->elevationColorMap->getScalarRangeMax()*sf);
+			rsIt->contourLineSpacing*=sf;
+			rsIt->waterOpacity/=sf;
+			for(int i=0;i<4;++i)
+				rsIt->projectorTransform.getMatrix()(i,3)*=sf;
+			}
+		rainStrength*=sf;
+		evaporationRate*=sf;
+		demDistScale*=sf;
+
+		/* Create the frame filter object: */
+		frameFilter=new FrameFilter(frameSize,numAveragingSlots,pixelDepthCorrection,cameraIps.depthProjection,basePlane);
+		frameFilter->setValidElevationInterval(cameraIps.depthProjection,basePlane,elevationRange.getMin(),elevationRange.getMax());
+		frameFilter->setStableParameters(minNumSamples,maxVariance);
+		frameFilter->setHysteresis(hysteresis);
+		frameFilter->setSpatialFilter(true);
+		frameFilter->setOutputFrameFunction(Misc::createFunctionCall(this,&Sandbox::receiveFilteredFrame));
+		
+		if(waterSpeed>0.0)
+			{
+			/* Create the hand extractor object: */
+			handExtractor=new HandExtractor(frameSize,pixelDepthCorrection,cameraIps.depthProjection);
+			}
+		
+		/* Start streaming depth frames: */
+		camera->startStreaming(0,Misc::createFunctionCall(this,&Sandbox::rawDepthFrameDispatcher));
+		
+		/* Create the depth image renderer: */
+		depthImageRenderer=new DepthImageRenderer(frameSize);
+		depthImageRenderer->setIntrinsics(cameraIps);
+		depthImageRenderer->setBasePlane(basePlane);
+		
+		/* Calculate the transformation from camera space to sandbox space: */
+		{
+		ONTransform::Vector z=basePlane.getNormal();
+		ONTransform::Vector x=(basePlaneCorners[1]-basePlaneCorners[0])+(basePlaneCorners[3]-basePlaneCorners[2]);
+		ONTransform::Vector y=z^x;
+		boxTransform=ONTransform::rotate(Geometry::invert(ONTransform::Rotation::fromBaseVectors(x,y)));
+		ONTransform::Point center=Geometry::mid(Geometry::mid(basePlaneCorners[0],basePlaneCorners[1]),Geometry::mid(basePlaneCorners[2],basePlaneCorners[3]));
+		boxTransform*=ONTransform::translateToOriginFrom(basePlane.project(center));
+		}
+		
+		/* Calculate a bounding box around all potential surfaces: */
+		bbox=Box::empty;
+		for(int i=0;i<4;++i)
+			{
+			bbox.addPoint(basePlane.project(basePlaneCorners[i])+basePlane.getNormal()*elevationRange.getMin());
+			bbox.addPoint(basePlane.project(basePlaneCorners[i])+basePlane.getNormal()*elevationRange.getMax());
+			}
+		
+		if(waterSpeed>0.0)
+			{
+			/* Initialize the water flow simulator: */
+			waterTable=new WaterTable2(wtSizeAlter[0],wtSizeAlter[1],depthImageRenderer,basePlaneCorners);
+			waterTable->setElevationRange(elevationRange.getMin(),rainElevationRange.getMax());
+			waterTable->setWaterDeposit(evaporationRate);
+			
+			/* Register a render function with the water table: */
+			addWaterFunction=Misc::createFunctionCall(this,&Sandbox::addWater);
+			waterTable->addRenderFunction(addWaterFunction);
+			addWaterFunctionRegistered=true;
+			}
+		
+		/* Initialize all surface renderers: */
+		for(std::vector<RenderSettings>::iterator rsIt=renderSettings.begin();rsIt!=renderSettings.end();++rsIt)
+			{
+			/* Calculate the texture mapping plane for this renderer's height map: */
+			if(rsIt->elevationColorMap!=0)
+				{
+				if(haveHeightMapPlane)
+					rsIt->elevationColorMap->calcTexturePlane(heightMapPlane);
+				else
+					rsIt->elevationColorMap->calcTexturePlane(depthImageRenderer);
+				}
+			
+			/* Initialize the surface renderer: */
+			rsIt->surfaceRenderer=new SurfaceRenderer(depthImageRenderer);
+			rsIt->surfaceRenderer->setDrawContourLines(rsIt->useContourLines);
+			rsIt->surfaceRenderer->setContourLineDistance(rsIt->contourLineSpacing);
+			rsIt->surfaceRenderer->setElevationColorMap(rsIt->elevationColorMap);
+			rsIt->surfaceRenderer->setIlluminate(rsIt->hillshade);
+			if(waterTable!=0)
+				{
+				if(rsIt->renderWaterSurface)
+					{
+					/* Create a water renderer: */
+					rsIt->waterRenderer=new WaterRenderer(waterTable);
+					}
+				else
+					{
+					rsIt->surfaceRenderer->setWaterTable(waterTable);
+					rsIt->surfaceRenderer->setAdvectWaterTexture(true);
+					rsIt->surfaceRenderer->setWaterOpacity(rsIt->waterOpacity);
+					}
+				}
+			rsIt->surfaceRenderer->setDemDistScale(demDistScale);
+			}
+		#endif
+	}
 
 void Sandbox::waterAttenuationSliderCallback(GLMotif::TextFieldSlider::ValueChangedCallbackData* cbData)
 	{
 	waterTable->setAttenuation(GLfloat(1.0-cbData->value));
 	}
 
+/**
+ * Place to add buttons to the internal GUI,
+ * most notable place to attach method/functions
+ * to buttons that alter the simulation more complexly
+ * than just variable manipulation.
+ * 
+ * Check `Sandbox::createWaterControlDialog`
+ * for variable manipulation during runtime.
+ */
 GLMotif::PopupMenu* Sandbox::createMainMenu(void)
 	{
 	/* Create a popup shell to hold the main menu: */
@@ -398,9 +537,15 @@ GLMotif::PopupMenu* Sandbox::createMainMenu(void)
 		showWaterControlDialogButton->getSelectCallbacks().add(this,&Sandbox::showWaterControlDialogCallback);
 		}
 	
+	#ifdef ADMU_ALLS
 	varyingRainToggle=new GLMotif::ToggleButton("VaryingRainToggle",mainMenu,"Varying Rain");
 	varyingRainToggle->setToggle(false);
 	varyingRainToggle->getValueChangedCallbacks().add(this,&Sandbox::varyingRainCallback);
+	#endif
+
+	seepageToggle=new GLMotif::ToggleButton("SeepageToggle",mainMenu,"Enable Seepage");
+	seepageToggle->setToggle(false);
+	seepageToggle->getValueChangedCallbacks().add(this,&Sandbox::seepageCallback);
 
 	/* Finish building the main menu: */
 	mainMenu->manageChild();
@@ -408,6 +553,17 @@ GLMotif::PopupMenu* Sandbox::createMainMenu(void)
 	return mainMenuPopup;
 	}
 
+/**
+ * Modified the internal GUI, order of GUI variables/elements:
+ * Rain Strength
+ * Evaporation Rate
+ * Water Speed
+ * Water Opacity
+ * Contour Lines
+ * Scale - not feasible due to inefficiency of code during runtime
+ * Elapsed Time
+ * 
+ */
 GLMotif::PopupWindow* Sandbox::createWaterControlDialog(void)
 	{
 	const GLMotif::StyleSheet& ss=*Vrui::getWidgetManager()->getStyleSheet();
@@ -423,20 +579,7 @@ GLMotif::PopupWindow* Sandbox::createWaterControlDialog(void)
 	waterControlDialog->setPacking(GLMotif::RowColumn::PACK_TIGHT);
 	waterControlDialog->setNumMinorWidgets(2);
 	
-	new GLMotif::Label("WaterSpeedLabel",waterControlDialog,"Speed");
-	
-	waterSpeedSlider=new GLMotif::TextFieldSlider("WaterSpeedSlider",waterControlDialog,8,ss.fontHeight*10.0f);
-	waterSpeedSlider->getTextField()->setFieldWidth(7);
-	waterSpeedSlider->getTextField()->setPrecision(4);
-	waterSpeedSlider->getTextField()->setFloatFormat(GLMotif::TextField::SMART);
-	waterSpeedSlider->setSliderMapping(GLMotif::TextFieldSlider::EXP10);
-	waterSpeedSlider->setValueRange(0.001,10.0,0.05);
-	waterSpeedSlider->getSlider()->addNotch(0.0f);
-	waterSpeedSlider->setValue(waterSpeed);
-	waterSpeedSlider->getValueChangedCallbacks().add(this,&Sandbox::waterSpeedSliderCallback);
-	
 	new GLMotif::Label("RainStrengthLabel",waterControlDialog,"Rain Strength");
-	
 	rainStrengthSlider=new GLMotif::TextFieldSlider("RainStrengthSlider",waterControlDialog,8,ss.fontHeight*10.0f);
 	rainStrengthSlider->getTextField()->setFieldWidth(7);
 	rainStrengthSlider->getTextField()->setPrecision(4);
@@ -448,7 +591,6 @@ GLMotif::PopupWindow* Sandbox::createWaterControlDialog(void)
 	rainStrengthSlider->getValueChangedCallbacks().add(this,&Sandbox::rainStrengthSliderCallback);
 
 	new GLMotif::Label("EvaporationRateLabel",waterControlDialog,"Evaporation Rate");
-	
 	evaporationRateSlider=new GLMotif::TextFieldSlider("EvaporationRateSlider",waterControlDialog,8,ss.fontHeight*10.0f);
 	evaporationRateSlider->getTextField()->setFieldWidth(7);
 	evaporationRateSlider->getTextField()->setPrecision(4);
@@ -459,20 +601,18 @@ GLMotif::PopupWindow* Sandbox::createWaterControlDialog(void)
 	evaporationRateSlider->setValue(evaporationRate);
 	evaporationRateSlider->getValueChangedCallbacks().add(this,&Sandbox::evaporationRateSliderCallback);
 
-	new GLMotif::Label("WaterMaxStepsLabel",waterControlDialog,"Max Steps");
-	
-	waterMaxStepsSlider=new GLMotif::TextFieldSlider("WaterMaxStepsSlider",waterControlDialog,8,ss.fontHeight*10.0f);
-	waterMaxStepsSlider->getTextField()->setFieldWidth(7);
-	waterMaxStepsSlider->getTextField()->setPrecision(0);
-	waterMaxStepsSlider->getTextField()->setFloatFormat(GLMotif::TextField::FIXED);
-	waterMaxStepsSlider->setSliderMapping(GLMotif::TextFieldSlider::LINEAR);
-	waterMaxStepsSlider->setValueType(GLMotif::TextFieldSlider::UINT);
-	waterMaxStepsSlider->setValueRange(0,200,1);
-	waterMaxStepsSlider->setValue(waterMaxSteps);
-	waterMaxStepsSlider->getValueChangedCallbacks().add(this,&Sandbox::waterMaxStepsSliderCallback);
+	new GLMotif::Label("WaterSpeedLabel",waterControlDialog,"Water Speed");
+	waterSpeedSlider=new GLMotif::TextFieldSlider("WaterSpeedSlider",waterControlDialog,8,ss.fontHeight*10.0f);
+	waterSpeedSlider->getTextField()->setFieldWidth(7);
+	waterSpeedSlider->getTextField()->setPrecision(4);
+	waterSpeedSlider->getTextField()->setFloatFormat(GLMotif::TextField::SMART);
+	waterSpeedSlider->setSliderMapping(GLMotif::TextFieldSlider::EXP10);
+	waterSpeedSlider->setValueRange(0.001,10.0,0.05);
+	waterSpeedSlider->getSlider()->addNotch(0.0f);
+	waterSpeedSlider->setValue(waterSpeed);
+	waterSpeedSlider->getValueChangedCallbacks().add(this,&Sandbox::waterSpeedSliderCallback);
 	
 	new GLMotif::Label("WaterOpacityLabel",waterControlDialog,"Water Opacity");
-	
 	waterOpacitySlider=new GLMotif::TextFieldSlider("WaterOpacitySlider",waterControlDialog,8,ss.fontHeight*10.0f);
 	waterOpacitySlider->getTextField()->setFieldWidth(7);
 	waterOpacitySlider->getTextField()->setPrecision(4);
@@ -484,7 +624,6 @@ GLMotif::PopupWindow* Sandbox::createWaterControlDialog(void)
 	waterOpacitySlider->getValueChangedCallbacks().add(this,&Sandbox::waterOpacitySliderCallback);
 
 	new GLMotif::Label("ContourLinesLabel",waterControlDialog,"Contour Lines");
-	
 	contourLinesSlider=new GLMotif::TextFieldSlider("ContourLinesSlider",waterControlDialog,8,ss.fontHeight*10.0f);
 	contourLinesSlider->getTextField()->setFieldWidth(7);
 	contourLinesSlider->getTextField()->setPrecision(4);
@@ -495,34 +634,56 @@ GLMotif::PopupWindow* Sandbox::createWaterControlDialog(void)
 	contourLinesSlider->setValue(renderSettings.back().contourLineSpacing);
 	contourLinesSlider->getValueChangedCallbacks().add(this,&Sandbox::contourLinesSliderCallback);
 
-	new GLMotif::Label("ElapsedTimeLabel",waterControlDialog,"Elapsed Time");
+	#ifdef ADMU_ALLS
+	/**
+	 * Highly experimental, more efficient code is needed to able to manipulate
+	 * scale during runtime
+	 */
+	new GLMotif::Label("ScaleLabel",waterControlDialog,"Scale");
+	scaleSlider=new GLMotif::TextFieldSlider("ScaleSlider",waterControlDialog,8,ss.fontHeight*10.0f);
+	scaleSlider->getTextField()->setFieldWidth(7);
+	scaleSlider->getTextField()->setPrecision(4);
+	scaleSlider->getTextField()->setFloatFormat(GLMotif::TextField::SMART);
+	scaleSlider->setSliderMapping(GLMotif::TextFieldSlider::EXP10);
+	scaleSlider->setValueRange(1,100000,1);
+	scaleSlider->getSlider()->addNotch(0.25f);
+	scaleSlider->setValue(scale);
+	scaleSlider->getValueChangedCallbacks().add(this,&Sandbox::scaleSliderCallback);
+	#endif
 
+	new GLMotif::Label("ElapsedTimeLabel",waterControlDialog,"Elapsed Time");
 	GLMotif::Margin* elapsedTimeMargin=new GLMotif::Margin("ElapsedTimeMargin",waterControlDialog,false);
 	elapsedTimeMargin->setAlignment(GLMotif::Alignment::LEFT);
-	
 	elapsedTimeTextField=new GLMotif::TextField("ElapsedTimeTextField",elapsedTimeMargin,8);
 	elapsedTimeTextField->setFieldWidth(7);
 	elapsedTimeTextField->setPrecision(2);
 	elapsedTimeTextField->setFloatFormat(GLMotif::TextField::FIXED);
 	elapsedTimeTextField->setValue(0.0);
-
 	elapsedTimeMargin->manageChild();
 	
-	// new GLMotif::Label("FrameRateLabel",waterControlDialog,"Frame Rate");
+	#ifdef ADMU_ALLS
+	new GLMotif::Label("WaterMaxStepsLabel",waterControlDialog,"Max Steps");
+	waterMaxStepsSlider=new GLMotif::TextFieldSlider("WaterMaxStepsSlider",waterControlDialog,8,ss.fontHeight*10.0f);
+	waterMaxStepsSlider->getTextField()->setFieldWidth(7);
+	waterMaxStepsSlider->getTextField()->setPrecision(0);
+	waterMaxStepsSlider->getTextField()->setFloatFormat(GLMotif::TextField::FIXED);
+	waterMaxStepsSlider->setSliderMapping(GLMotif::TextFieldSlider::LINEAR);
+	waterMaxStepsSlider->setValueType(GLMotif::TextFieldSlider::UINT);
+	waterMaxStepsSlider->setValueRange(0,200,1);
+	waterMaxStepsSlider->setValue(waterMaxSteps);
+	waterMaxStepsSlider->getValueChangedCallbacks().add(this,&Sandbox::waterMaxStepsSliderCallback);
 	
-	// GLMotif::Margin* frameRateMargin=new GLMotif::Margin("FrameRateMargin",waterControlDialog,false);
-	// frameRateMargin->setAlignment(GLMotif::Alignment::LEFT);
-	
-	// frameRateTextField=new GLMotif::TextField("FrameRateTextField",frameRateMargin,8);
-	// frameRateTextField->setFieldWidth(7);
-	// frameRateTextField->setPrecision(2);
-	// frameRateTextField->setFloatFormat(GLMotif::TextField::FIXED);
-	// frameRateTextField->setValue(0.0);
-	
-	// frameRateMargin->manageChild();
+	new GLMotif::Label("FrameRateLabel",waterControlDialog,"Frame Rate");
+	GLMotif::Margin* frameRateMargin=new GLMotif::Margin("FrameRateMargin",waterControlDialog,false);
+	frameRateMargin->setAlignment(GLMotif::Alignment::LEFT);
+	frameRateTextField=new GLMotif::TextField("FrameRateTextField",frameRateMargin,8);
+	frameRateTextField->setFieldWidth(7);
+	frameRateTextField->setPrecision(2);
+	frameRateTextField->setFloatFormat(GLMotif::TextField::FIXED);
+	frameRateTextField->setValue(0.0);
+	frameRateMargin->manageChild();
 	
 	new GLMotif::Label("WaterAttenuationLabel",waterControlDialog,"Attenuation");
-	
 	waterAttenuationSlider=new GLMotif::TextFieldSlider("WaterAttenuationSlider",waterControlDialog,8,ss.fontHeight*10.0f);
 	waterAttenuationSlider->getTextField()->setFieldWidth(7);
 	waterAttenuationSlider->getTextField()->setPrecision(5);
@@ -532,7 +693,8 @@ GLMotif::PopupWindow* Sandbox::createWaterControlDialog(void)
 	waterAttenuationSlider->getSlider()->addNotch(Math::log10(1.0-double(waterTable->getAttenuation())));
 	waterAttenuationSlider->setValue(1.0-double(waterTable->getAttenuation()));
 	waterAttenuationSlider->getValueChangedCallbacks().add(this,&Sandbox::waterAttenuationSliderCallback);
-	
+	#endif
+
 	waterControlDialog->manageChild();
 	
 	return waterControlDialogPopup;
@@ -645,14 +807,15 @@ void printUsage(void)
 Sandbox::Sandbox(int& argc,char**& argv)
 	:Vrui::Application(argc,argv),
 	 camera(0),pixelDepthCorrection(0),
-	 frameFilter(0),pauseUpdates(false),varyingRain(false),
+	 frameFilter(0),pauseUpdates(false),seepage(0),totalRaintime(0),
 	 depthImageRenderer(0),
 	 waterTable(0),
 	 handExtractor(0),addWaterFunction(0),addWaterFunctionRegistered(false),
 	 sun(0),
 	 activeDem(0),
 	 mainMenu(0),pauseUpdatesToggle(0),varyingRainToggle(0),waterControlDialog(0),
-	 waterSpeedSlider(0),rainStrengthSlider(0),evaporationRateSlider(0),waterOpacitySlider(0),contourLinesSlider(0),elapsedTimeTextField(0),waterMaxStepsSlider(0),frameRateTextField(0),waterAttenuationSlider(0),
+	 waterSpeedSlider(0),rainStrengthSlider(0),evaporationRateSlider(0),waterOpacitySlider(0),contourLinesSlider(0),scaleSlider(0),elapsedTimeTextField(0),
+	 waterMaxStepsSlider(0),frameRateTextField(0),waterAttenuationSlider(0),
 	 controlPipeFd(-1)
 	{
 	/* Read the sandbox's default configuration parameters: */
@@ -688,8 +851,13 @@ Sandbox::Sandbox(int& argc,char**& argv)
 	evaporationRate=cfg.retrieveValue<double>("./evaporationRate",0.0);
 	float demDistScale=cfg.retrieveValue<float>("./demDistScale",1.0f);
 	std::string controlPipeName=cfg.retrieveString("./controlPipeName","");
+	#ifdef ADMU_ALLS
 	varyingRainValue=0.0f;
 	rainIncrement=true;
+	#endif
+	totalRaintime=0.0f;
+
+
 	/* Process command line parameters: */
 	bool printHelp=false;
 	const char* frameFilePrefix=0;
@@ -1179,6 +1347,11 @@ void Sandbox::toolDestructionCallback(Vrui::ToolManager::ToolDestructionCallback
 		}
 	}
 
+
+/**
+ * Notable place to put runtime variables, such as elapsed time or 
+ * toggle methods/functions, such as pause topography
+ */
 void Sandbox::frame(void)
 	{
 	/* Check if the filtered frame has been updated: */
@@ -1192,7 +1365,6 @@ void Sandbox::frame(void)
 		{
 		/* Lock the most recent extracted hand list: */
 		handExtractor->lockNewExtractedHands();
-		
 		#if 0
 		
 		/* Register/unregister the rain rendering function based on whether hands have been detected: */
@@ -1341,10 +1513,14 @@ void Sandbox::frame(void)
 		/* Update the time elapsed display: */
 		elapsedTimeTextField->setValue(elapsedTime += Vrui::getFrameTime());
 		}
-	
+	#ifdef ADMU_ALLS
+	/* Varying rain experimental function */
 	if(varyingRainToggle!=0&&varyingRain)
 		{
 		// KOCCHI
+		// 0.02 - 0.03
+		// 0.04 - 0.08
+		// 0.08 - 0.12
 		double temp=(rand()%20)/100.0f;
 		if(varyingRainValue<1.5f&&rainIncrement)
 		{
@@ -1356,12 +1532,41 @@ void Sandbox::frame(void)
 			varyingRainValue-=temp;
 			if(varyingRainValue<=-1.5f) rainIncrement=true;
 		}
-
-
-		// if(varyingRainValue > 1.5f) varyingRainValue-=temp;
-		// else if(varyingRainValue < -1.0f) varyingRainValue+=temp;
 		waterTable->setWaterDeposit(varyingRainValue);
-		// std::cout << varyingRainValue << std::endl;
+		}
+	/* `Test` experimental function */
+	if(testToggle!=0&&test)
+		{
+		
+		}
+	else if(testToggle!=0&&!test)
+		{
+		
+		}
+	#endif
+	/**
+	 * Experimental Seepage code
+	 * totalRaintime increments as hand is placed over sandbox
+	 * totalRaintime decrements as hand is removed
+	 * as totalRaintime decrements, the sandbox sets the
+	 * evaporation rate so as to remove a percentage of total water added
+	 */
+	if(seepage&&!handExtractor->getLockedExtractedHands().empty())
+		{
+			totalRaintime += Vrui::getFrameTime();
+			// std::cout << "RAIN: " << totalRaintime << " :: " << rainStrength << std::endl;
+		}
+	if(seepage&&handExtractor->getLockedExtractedHands().empty()&&totalRaintime>0.0f)
+		{
+			totalRaintime -= Vrui::getFrameTime();
+			double ratio = 10*Vrui::getFrameTime()*rainStrength*(-1);
+			waterTable->setWaterDeposit(ratio);
+			if(totalRaintime<0.0f)
+				{
+				totalRaintime=0.0f;
+				waterTable->setWaterDeposit(0);
+				}
+			// std::cout << "SEEPAGE: " << totalRaintime << " :: " << ratio << std::endl;
 		}
 
 	if(pauseUpdates)
@@ -1372,7 +1577,6 @@ void Sandbox::display(GLContextData& contextData) const
 	{
 	/* Get the data item: */
 	DataItem* dataItem=contextData.retrieveDataItem<DataItem>(this);
-	
 	/* Get the rendering settings for this window: */
 	const Vrui::DisplayState& ds=Vrui::getDisplayState(contextData);
 	const Vrui::VRWindow* window=ds.window;

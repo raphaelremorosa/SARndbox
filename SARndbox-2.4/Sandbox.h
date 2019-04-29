@@ -131,9 +131,12 @@ class Sandbox:public Vrui::Application,public GLObject
 	Kinect::FrameSource::IntrinsicParameters cameraIps; // Intrinsic parameters of the Kinect camera
 	FrameFilter* frameFilter; // Processing object to filter raw depth frames from the Kinect camera
 	bool pauseUpdates; // Pauses updates of the topography
+	#ifdef ADMU_ALLS
 	bool varyingRain;
 	double varyingRainValue;
 	bool rainIncrement;
+	#endif
+	bool seepage;
 	Threads::TripleBuffer<Kinect::FrameBuffer> filteredFrames; // Triple buffer for incoming filtered depth frames
 	DepthImageRenderer* depthImageRenderer; // Object managing the current filtered depth image
 	ONTransform boxTransform; // Transformation from camera space to baseplane space (x along long sandbox axis, z up)
@@ -143,7 +146,8 @@ class Sandbox:public Vrui::Application,public GLObject
 	unsigned int waterMaxSteps; // Maximum number of water simulation steps per frame
 	GLfloat rainStrength; // Amount of water deposited by rain tools and objects on each water simulation step
 	double evaporationRate;
-	double elapsedTime;
+	double elapsedTime; 
+	double totalRaintime;
 	HandExtractor* handExtractor; // Object to detect splayed hands above the sand surface to make rain
 	const AddWaterFunction* addWaterFunction; // Render function registered with the water table
 	bool addWaterFunctionRegistered; // Flag if the water adding function is currently registered with the water table
@@ -156,6 +160,7 @@ class Sandbox:public Vrui::Application,public GLObject
 	GLMotif::PopupMenu* mainMenu;
 	GLMotif::ToggleButton* pauseUpdatesToggle;
 	GLMotif::ToggleButton* varyingRainToggle;
+	GLMotif::ToggleButton* seepageToggle;
 	GLMotif::PopupWindow* waterControlDialog;
 	GLMotif::TextFieldSlider* waterSpeedSlider;
 	GLMotif::TextFieldSlider* rainStrengthSlider;
@@ -163,6 +168,7 @@ class Sandbox:public Vrui::Application,public GLObject
 	GLMotif::TextFieldSlider* waterMaxStepsSlider;
 	GLMotif::TextFieldSlider* waterOpacitySlider;
 	GLMotif::TextFieldSlider* contourLinesSlider;
+	GLMotif::TextFieldSlider* scaleSlider;
 	GLMotif::TextField* frameRateTextField;
 	GLMotif::TextField* elapsedTimeTextField;
 	GLMotif::TextFieldSlider* waterAttenuationSlider;
@@ -174,15 +180,20 @@ class Sandbox:public Vrui::Application,public GLObject
 	void toggleDEM(DEM* dem); // Sets or toggles the currently active DEM
 	void addWater(GLContextData& contextData) const; // Function to render geometry that adds water to the water table
 	void pauseUpdatesCallback(GLMotif::ToggleButton::ValueChangedCallbackData* cbData);
-	void varyingRainCallback(GLMotif::ToggleButton::ValueChangedCallbackData* cbData);
 	void showWaterControlDialogCallback(Misc::CallbackData* cbData);
 	void waterSpeedSliderCallback(GLMotif::TextFieldSlider::ValueChangedCallbackData* cbData);
 	void rainStrengthSliderCallback(GLMotif::TextFieldSlider::ValueChangedCallbackData* cbData);
-	void evaporationRateSliderCallback(GLMotif::TextFieldSlider::ValueChangedCallbackData* cbData);
 	void waterMaxStepsSliderCallback(GLMotif::TextFieldSlider::ValueChangedCallbackData* cbData);
+	void waterAttenuationSliderCallback(GLMotif::TextFieldSlider::ValueChangedCallbackData* cbData);
+
+	/* Added method callbacks */
 	void waterOpacitySliderCallback(GLMotif::TextFieldSlider::ValueChangedCallbackData* cbData);
 	void contourLinesSliderCallback(GLMotif::TextFieldSlider::ValueChangedCallbackData* cbData);
-	void waterAttenuationSliderCallback(GLMotif::TextFieldSlider::ValueChangedCallbackData* cbData);
+	void scaleSliderCallback(GLMotif::TextFieldSlider::ValueChangedCallbackData* cbData);
+	void evaporationRateSliderCallback(GLMotif::TextFieldSlider::ValueChangedCallbackData* cbData);
+	void varyingRainCallback(GLMotif::ToggleButton::ValueChangedCallbackData* cbData);
+	void seepageCallback(GLMotif::ToggleButton::ValueChangedCallbackData* cbData);
+	
 	GLMotif::PopupMenu* createMainMenu(void);
 	GLMotif::PopupWindow* createWaterControlDialog(void);
 	
