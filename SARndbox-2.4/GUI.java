@@ -28,7 +28,6 @@ public class GUI extends JComponent implements ActionListener, ChangeListener
 	{
 		f = new JFrame("SARndbox GUI");
 		JButton button;
-		JLabel temp = new JLabel("Tropical Cyclone Warning Signals");
 		
 		Border blackline;
 		blackline = BorderFactory.createLineBorder(Color.black);
@@ -79,34 +78,44 @@ public class GUI extends JComponent implements ActionListener, ChangeListener
 			textArea[i].setBorder(blackline);
 			right.add(textArea[i]);
 			textArea[i].setEditable(false);
-			
 		}
 		right.add(textField);
 		f.add(right,BorderLayout.EAST);
-
+		JButton butt = new JButton("Simulate");
+		String regex = "[1-9]+[0-9]*(.[0-9]+)?";
 		textField.addKeyListener(new KeyAdapter(){
 			public void keyReleased(KeyEvent ke)
 			{
-				String typed = textField.getText();
-				int sf = (int)(Double.parseDouble(typed)/100.0);
-        		textArea[0].setText("" + 0.25*sf); //rain strength
-				textArea[1].setText("" + 0.0*sf); //evaporation rate
-				textArea[2].setText("" + 1.0); //water speed
-				if(sf > 100) textArea[3].setText("" + 2.0/sf); //water opacity
-				textArea[4].setText("" + 0.75*sf); //contour lines
+				if(textField.getText().matches(regex))
+				{
+					butt.setEnabled(true);
+					String typed = textField.getText();
+					int sf = (int)(Double.parseDouble(typed)/100.0);
+					textArea[0].setText("" + 0.25*sf); //rain strength
+					textArea[1].setText("" + 0.0*sf); //evaporation rate
+					textArea[2].setText("" + 1.0); //water speed
+					if(sf > 100) textArea[3].setText("" + 2.0/sf); //water opacity
+					textArea[4].setText("" + 0.75*sf); //contour lines
+				}
+				else
+				{
+					butt.setEnabled(false);
+				}
+				
 			}
 		});	
-		
+
 		JPanel bot = new JPanel();
 		bot.setLayout(new FlowLayout(FlowLayout.CENTER));
-		bot.add(button = new JButton("Simulate"));
+		bot.add(butt);
 		f.add(bot,BorderLayout.SOUTH);
-		button.addActionListener(new ActionListener(){
+		butt.addActionListener(new ActionListener(){
 			public void actionPerformed(ActionEvent ae)
 			{
 				Double s = Double.valueOf(textField.getText());
+				Double evr = Double.valueOf(textArea[1].getText());
 				pb = new ProcessBuilder(new String[]{"/bin/bash", "-c", 
-				"make && ./bin/SARndbox -s " + s + " > out.txt"});
+				"make && ./bin/SARndbox -uhm -fpv -s " + s + " -evr " + evr + " > out.txt"});
 				try
 				{
 					p = pb.start();
@@ -118,9 +127,10 @@ public class GUI extends JComponent implements ActionListener, ChangeListener
 			}
 		});
 		
-		f.setSize(250,350);
+		f.setSize(270,350);
 		f.setResizable(false);
 		f.setVisible(true);
+		f.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
 	}
 	
 	public void actionPerformed(ActionEvent ae)
@@ -131,17 +141,17 @@ public class GUI extends JComponent implements ActionListener, ChangeListener
 			case "Yellow":
 				value = Math.random() * 7.5 + 7.5;
 				value = value / 360;
-				textArea[1].setText(value.toString());
+				textArea[1].setText(value.toString().substring(0,11));
 				break;
 			case "Orange":
 				value = Math.random() * 15 + 15;
 				value = value / 360;
-				textArea[1].setText(value.toString());
+				textArea[1].setText(value.toString().substring(0,11));
 				break;
 			case "Red":
 				value = Math.random() * 15 + 30;
 				value = value / 360;
-				textArea[1].setText(value.toString());
+				textArea[1].setText(value.toString().substring(0,11));
 				break;
 			default:
 				break;

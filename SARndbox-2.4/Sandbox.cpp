@@ -1553,16 +1553,36 @@ void Sandbox::frame(void)
 	 */
 	if(seepage&&!handExtractor->getLockedExtractedHands().empty())
 		{
+			#ifdef EXPERIMENTAL
+			if(totalRaintime>5.0)
+				{
+					seepage=!seepage;
+					waterTable->setWaterDeposit((-1)*rainStrength*0.05);
+				}
+			#endif
 			totalRaintime += Vrui::getFrameTime();
 		}
-	if(seepage&&handExtractor->getLockedExtractedHands().empty()&&totalRaintime>0.0f)
+	#ifdef EXPERIMENTAL
+	if(!seepage&&handExtractor->getLockedExtractedHands().empty()&&totalRaintime>0.0)
 		{
+			if(totalRaintime<0.0)
+			{
+				totalRaintime=0.0;
+				waterTable->setWaterDeposit(0);
+			}
+			totalRaintime -= 100*Vrui::getFrameTime();
+		}
+	#endif
+	else if(seepage&&handExtractor->getLockedExtractedHands().empty()&&totalRaintime>0.0f)
+		{
+			/* Main concern for the proper implementation of the seepage function */
+			double ratio = 5; // 50 looks more like 90%
+			waterTable->setWaterDeposit((-1)*rainStrength*(ratio/100.0f));
 			/* Time ratio; =1 normal, >1 longer, <1 shorter */
 			double tRatio = 0.5;
 			totalRaintime -= Vrui::getFrameTime()/tRatio;
-			/* Main concern for the proper implementation of the seepage function */
-			double ratio = 1; // 50 looks more like 90%
-			waterTable->setWaterDeposit((-1)*rainStrength*(ratio/100.0f));
+			// totalRaintime -= (1.0*Vrui::getFrameTime());
+			// totalRaintime /= 2.0 - Vrui::getFrameTime();
 			if(totalRaintime<0.0f)
 				{
 				totalRaintime=0.0f;
