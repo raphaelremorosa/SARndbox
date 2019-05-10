@@ -3,7 +3,7 @@ Augmented reality application scanning a sand surface using a Kinect 3D camera, 
 
 This code that was originally from UC Davis was modified to further model flood-related scenarios.
 
-Thesis: Simulating Flood-related Disaster Scenarios Using an Augmented Reality Sandbox
+Thesis: __Simulating Flood-related Disaster Scenarios Using an Augmented Reality Sandbox__
 Authors: Faine Mabry A. Fonseca, Raphael S. Remorosa, Aaron Cole T. See
 Advisors: Paolo Antonio G. Gonzalez, Ma. Mercedes T. Rodrigo, Ph.D
 
